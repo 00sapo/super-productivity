@@ -626,7 +626,14 @@ export class PluginBridgeService implements OnDestroy {
   }
 
   /**
-   * Returns a full read-only snapshot of the application state for plugins.
+   * Returns a read-only snapshot of the application state for plugins.
+   *
+   * Credential surfaces are stripped before returning:
+   * - `globalConfig.sync` (WebDAV/Nextcloud passwords, SuperSync access
+   *   tokens, encryption keys)
+   * - `globalConfig.misc.unsplashApiKey`
+   * - per-project `issueIntegrationCfgs` (Jira/CalDAV passwords,
+   *   GitLab/Redmine tokens, OpenProject/Trello/Linear keys)
    */
   async getAppState(): Promise<PluginAppState> {
     const [
@@ -659,9 +666,30 @@ export class PluginBridgeService implements OnDestroy {
       };
     });
 
+    const projects: Record<string, ProjectCopy> = {};
+    const rawProjects = (projectState?.entities ?? {}) as Record<
+      string,
+      ProjectCopy | undefined
+    >;
+    for (const id of Object.keys(rawProjects)) {
+      const p = rawProjects[id];
+      if (!p) continue;
+      const safe = { ...p };
+      delete (safe as { issueIntegrationCfgs?: unknown }).issueIntegrationCfgs;
+      projects[id] = safe as ProjectCopy;
+    }
+
+    const safeGlobalConfig: Record<string, unknown> = { ...(globalConfig ?? {}) };
+    delete safeGlobalConfig['sync'];
+    if (safeGlobalConfig['misc']) {
+      const safeMisc = { ...(safeGlobalConfig['misc'] as Record<string, unknown>) };
+      delete safeMisc['unsplashApiKey'];
+      safeGlobalConfig['misc'] = safeMisc;
+    }
+
     return {
       tasks: (taskState?.entities ?? {}) as Record<string, Task>,
-      projects: (projectState?.entities ?? {}) as Record<string, ProjectCopy>,
+      projects,
       tags: (tagState?.entities ?? {}) as Record<string, TagCopy>,
       notes: (noteState?.entities ?? {}) as Record<string, PluginNote>,
       taskRepeatCfgs: (taskRepeatCfgState?.entities ?? {}) as Record<
@@ -669,7 +697,7 @@ export class PluginBridgeService implements OnDestroy {
         PluginTaskRepeatCfg
       >,
       simpleCounters,
-      globalConfig: (globalConfig ?? {}) as Record<string, unknown>,
+      globalConfig: safeGlobalConfig,
     };
   }
 
