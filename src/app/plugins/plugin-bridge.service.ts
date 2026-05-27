@@ -58,6 +58,7 @@ import { distinctUntilChanged, first, map, take, timeout } from 'rxjs/operators'
 import { firstValueFrom } from 'rxjs';
 import { selectProjectFeatureState } from '../features/project/store/project.selectors';
 import { selectNoteFeatureState } from '../features/note/store/note.reducer';
+import { selectTagFeatureState } from '../features/tag/store/tag.reducer';
 import { selectTaskByIdWithSubTaskData } from '../features/tasks/store/task.selectors';
 import { PluginUserPersistenceService } from './plugin-user-persistence.service';
 import { PluginConfigService } from './plugin-config.service';
@@ -663,7 +664,10 @@ export class PluginBridgeService implements OnDestroy {
       projects: (projectState?.entities ?? {}) as Record<string, ProjectCopy>,
       tags: (tagState?.entities ?? {}) as Record<string, TagCopy>,
       notes: (noteState?.entities ?? {}) as Record<string, PluginNote>,
-      taskRepeatCfgs: (taskRepeatCfgState?.entities ?? {}) as Record<string, PluginTaskRepeatCfg>,
+      taskRepeatCfgs: (taskRepeatCfgState?.entities ?? {}) as Record<
+        string,
+        PluginTaskRepeatCfg
+      >,
       simpleCounters,
       globalConfig: (globalConfig ?? {}) as Record<string, unknown>,
     };
