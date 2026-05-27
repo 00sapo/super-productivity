@@ -296,6 +296,10 @@ Iframe plugins automatically receive:
 - `addTask(task)` - Create a new task
 - `updateTask(taskId, updates)` - Update existing task
 
+#### Application State
+
+- `getAppState()` - Get the current application state (read-only; returns `PluginAppState`). An overview of the data returned is the JSON file exported via `Settings > Sync & Backup > Import/Export > Export data`. Example: `const state = await PluginAPI.getAppState();`
+
 #### Projects
 
 - `getAllProjects()` - Get all projects
