@@ -32,16 +32,22 @@ import {
   BatchUpdateResult,
   OAuthFlowConfig,
   OAuthTokenResult,
+  PluginAppState,
   PluginManifest,
+  PluginNote,
+  PluginSimpleCounterFull,
+  PluginTaskRepeatCfg,
   SnackCfg,
 } from '@super-productivity/plugin-api';
 import { snackCfgToSnackParams } from './plugin-api-mapper';
 import { PluginHooksService } from './plugin-hooks';
 import { TaskService } from '../features/tasks/task.service';
 import { addSubTask } from '../features/tasks/store/task.actions';
+import { selectTaskFeatureState } from '../features/tasks/store/task.selectors';
 import { parseTimeSpentChanges } from '../features/tasks/short-syntax';
 import { GlobalConfigService } from '../features/config/global-config.service';
 import { DEFAULT_GLOBAL_CONFIG } from '../features/config/default-global-config.const';
+import { selectConfigFeatureState } from '../features/config/store/global-config.reducer';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { nanoid } from 'nanoid';
 import { WorkContextService } from '../features/work-context/work-context.service';
@@ -50,6 +56,8 @@ import { TagService } from '../features/tag/tag.service';
 import typia from 'typia';
 import { distinctUntilChanged, first, map, take, timeout } from 'rxjs/operators';
 import { firstValueFrom } from 'rxjs';
+import { selectProjectFeatureState } from '../features/project/store/project.selectors';
+import { selectNoteFeatureState } from '../features/note/store/note.reducer';
 import { selectTaskByIdWithSubTaskData } from '../features/tasks/store/task.selectors';
 import { PluginUserPersistenceService } from './plugin-user-persistence.service';
 import { PluginConfigService } from './plugin-config.service';
@@ -78,6 +86,7 @@ import { PluginService } from './plugin.service';
 
 // New imports for simple counters
 import { selectAllSimpleCounters } from '../features/simple-counter/store/simple-counter.reducer';
+import { selectTaskRepeatCfgFeatureState } from '../features/task-repeat-cfg/store/task-repeat-cfg.selectors';
 import {
   SimpleCounter,
   SimpleCounterType,
@@ -613,6 +622,51 @@ export class PluginBridgeService implements OnDestroy {
       .pipe(first())
       .toPromise();
     return contextTasks || [];
+  }
+
+  /**
+   * Returns a full read-only snapshot of the application state for plugins.
+   */
+  async getAppState(): Promise<PluginAppState> {
+    const [
+      taskState,
+      projectState,
+      tagState,
+      noteState,
+      taskRepeatCfgState,
+      allSimpleCounters,
+      globalConfig,
+    ] = await Promise.all([
+      firstValueFrom(this._store.select(selectTaskFeatureState)),
+      firstValueFrom(this._store.select(selectProjectFeatureState)),
+      firstValueFrom(this._store.select(selectTagFeatureState)),
+      firstValueFrom(this._store.select(selectNoteFeatureState)),
+      firstValueFrom(this._store.select(selectTaskRepeatCfgFeatureState)),
+      firstValueFrom(this._store.select(selectAllSimpleCounters)),
+      firstValueFrom(this._store.select(selectConfigFeatureState)),
+    ]);
+
+    const simpleCounters: Record<string, PluginSimpleCounterFull> = {};
+    (allSimpleCounters ?? []).forEach((counter) => {
+      simpleCounters[counter.id] = {
+        id: counter.id,
+        title: counter.title,
+        type: String(counter.type),
+        isEnabled: counter.isEnabled,
+        isOn: (counter as { isOn?: boolean }).isOn,
+        countOnDay: counter.countOnDay ?? {},
+      };
+    });
+
+    return {
+      tasks: (taskState?.entities ?? {}) as Record<string, Task>,
+      projects: (projectState?.entities ?? {}) as Record<string, ProjectCopy>,
+      tags: (tagState?.entities ?? {}) as Record<string, TagCopy>,
+      notes: (noteState?.entities ?? {}) as Record<string, PluginNote>,
+      taskRepeatCfgs: (taskRepeatCfgState?.entities ?? {}) as Record<string, PluginTaskRepeatCfg>,
+      simpleCounters,
+      globalConfig: (globalConfig ?? {}) as Record<string, unknown>,
+    };
   }
 
   async reInitData(): Promise<void> {
